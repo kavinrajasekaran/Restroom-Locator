@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-@main
+//@main
 struct Restroom_LocatorApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([

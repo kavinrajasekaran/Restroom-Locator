@@ -1,66 +1,55 @@
-//
-//  ContentView.swift
-//  Restroom Locator
-//
-//  Created by Kavin Rajasekaran on 9/28/24.
-//
+// ContentView.swift
 
 import SwiftUI
-import SwiftData
+import MapKit
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @StateObject var restaurantFetcher = RestaurantFetcher()
+    @EnvironmentObject var locationManager: LocationManager
+    @State private var selectedAnnotation: MKPointAnnotation?
+    @State private var showNoteView = false
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        ZStack {
+            MapView(annotations: combinedAnnotations, restaurantFetcher: restaurantFetcher)
+                .edgesIgnoringSafeArea(.all)
+                .onAppear {
+                    if let location = locationManager.lastLocation {
+                        restaurantFetcher.fetchRestaurants(location: location)
                     }
                 }
-                .onDelete(perform: deleteItems)
-            }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AnnotationSelected")), perform: { notification in
+                    if let annotation = notification.object as? MKPointAnnotation {
+                        selectedAnnotation = annotation
+                        showNoteView = true
+                    }
+                })
+                .onChange(of: locationManager.lastLocation) { newLocation in
+                    if let location = newLocation {
+                        restaurantFetcher.fetchRestaurants(location: location)
                     }
                 }
+
+            if showNoteView, let annotation = selectedAnnotation {
+                NoteView(annotation: annotation, isPresented: $showNoteView)
+                    .onDisappear {
+                        // Save user annotations when a note is added
+                        restaurantFetcher.saveUserAnnotations()
+                    }
             }
-        } detail: {
-            Text("Select an item")
+        }
+        .alert(isPresented: $locationManager.permissionDenied) {
+            Alert(
+                title: Text("Location Permission Denied"),
+                message: Text("Please enable location permissions in Settings."),
+                dismissButton: .default(Text("OK"))
+            )
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
+    // Combine fetched and user annotations
+    var combinedAnnotations: [MKPointAnnotation] {
+        restaurantFetcher.fetchedAnnotations + restaurantFetcher.userAnnotations
     }
 }
 
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
-}
