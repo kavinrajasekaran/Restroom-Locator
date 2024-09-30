@@ -5,7 +5,8 @@ import MapKit
 
 struct MapView: UIViewRepresentable {
     var annotations: [MKPointAnnotation]
-    var restaurantFetcher: RestaurantFetcher  // Added parameter
+    var restaurantFetcher: RestaurantFetcher
+    var userLocation: CLLocation?
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -14,6 +15,12 @@ struct MapView: UIViewRepresentable {
         // Show user location
         mapView.showsUserLocation = true
         mapView.userTrackingMode = .follow
+
+        // Center map on user's location if available
+        if let location = userLocation {
+            let region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000)
+            mapView.setRegion(region, animated: false)
+        }
 
         // Add Long Press Gesture Recognizer
         let longPressGesture = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(gestureRecognizer:)))
@@ -28,7 +35,7 @@ struct MapView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(self, restaurantFetcher: restaurantFetcher)  // Pass restaurantFetcher
+        Coordinator(self, restaurantFetcher: restaurantFetcher)
     }
 
     class Coordinator: NSObject, MKMapViewDelegate {

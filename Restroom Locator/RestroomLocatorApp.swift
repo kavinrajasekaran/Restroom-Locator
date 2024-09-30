@@ -1,16 +1,18 @@
 // RestroomLocatorApp.swift
 
 import SwiftUI
-import CoreLocation
 
 @main
 struct RestroomLocatorApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @StateObject var locationManager = LocationManager()
+    @StateObject var restaurantFetcher = RestaurantFetcher()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(LocationManager())
+                .environmentObject(locationManager)
+                .environmentObject(restaurantFetcher)
         }
     }
 }

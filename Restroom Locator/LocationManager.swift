@@ -1,14 +1,8 @@
-//
-//  LocationManager.swift
-//  Restroom Locator
-//
-//  Created by Kavin Rajasekaran on 9/28/24.
-//
-
 // LocationManager.swift
 
 import Foundation
 import CoreLocation
+import UIKit
 
 class LocationManager: NSObject, ObservableObject {
     private let manager = CLLocationManager()
@@ -19,8 +13,16 @@ class LocationManager: NSObject, ObservableObject {
     override init() {
         super.init()
         manager.delegate = self
-        manager.requestWhenInUseAuthorization()
-        manager.startUpdatingLocation()
+
+        // Check authorization status and request permission if not determined
+        if CLLocationManager.authorizationStatus() == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+        } else if CLLocationManager.authorizationStatus() == .authorizedWhenInUse ||
+                    CLLocationManager.authorizationStatus() == .authorizedAlways {
+            manager.startUpdatingLocation()
+        } else {
+            permissionDenied = true
+        }
     }
 }
 
@@ -38,10 +40,11 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        lastLocation = locations.first
+        lastLocation = locations.last
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("Location update failed: \(error.localizedDescription)")
     }
 }
+

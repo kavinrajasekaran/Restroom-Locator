@@ -66,4 +66,3 @@ class RestaurantFetcher: NSObject, ObservableObject {
         }
     }
 }
-
