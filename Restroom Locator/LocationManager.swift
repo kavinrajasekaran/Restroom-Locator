@@ -1,4 +1,7 @@
-// LocationManager.swift
+//
+//  LocationManager.swift
+//  Restroom Locator
+//
 
 import Foundation
 import CoreLocation
@@ -14,13 +17,13 @@ class LocationManager: NSObject, ObservableObject {
         super.init()
         manager.delegate = self
 
-        // Check authorization status and request permission if not determined
-        if CLLocationManager.authorizationStatus() == .notDetermined {
+        // Check authorization status and request permission if needed
+        switch CLLocationManager.authorizationStatus() {
+        case .notDetermined:
             manager.requestWhenInUseAuthorization()
-        } else if CLLocationManager.authorizationStatus() == .authorizedWhenInUse ||
-                    CLLocationManager.authorizationStatus() == .authorizedAlways {
+        case .authorizedWhenInUse, .authorizedAlways:
             manager.startUpdatingLocation()
-        } else {
+        default:
             permissionDenied = true
         }
     }
@@ -34,7 +37,9 @@ extension LocationManager: CLLocationManagerDelegate {
             manager.startUpdatingLocation()
         case .denied, .restricted:
             permissionDenied = true
-        default:
+        case .notDetermined:
+            break
+        @unknown default:
             break
         }
     }
@@ -47,4 +52,3 @@ extension LocationManager: CLLocationManagerDelegate {
         print("Location update failed: \(error.localizedDescription)")
     }
 }
-

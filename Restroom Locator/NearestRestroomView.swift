@@ -1,92 +1,78 @@
-// NearestRestroomView.swift
+//
+//  NearestRestroomView.swift
+//  Restroom Locator
+//
 
 import SwiftUI
 import MapKit
+import SwiftData
 
 struct NearestRestroomView: View {
-    @EnvironmentObject var restaurantFetcher: RestaurantFetcher
     @EnvironmentObject var locationManager: LocationManager
-    @State private var nearestAnnotation: MKPointAnnotation?
-    @State private var note: String?
+    @Environment(\.modelContext) private var context
+
+    @State private var nearestBathroom: Bathroom?
 
     var body: some View {
         VStack {
-            if let nearestAnnotation = nearestAnnotation {
-                Text("Nearest Restroom:")
+            if let nearest = nearestBathroom {
+                Text("Nearest Bathroom")
                     .font(.headline)
-                    .padding()
-
-                Text(nearestAnnotation.title ?? "Unknown")
+                Text(nearest.name ?? "Unknown")
                     .font(.title)
                     .padding()
 
-                if let note = note {
-                    Text("Note: \(note)")
-                        .padding()
-                } else {
-                    Text("No note available.")
-                        .padding()
-                }
+                let code = bestCode(for: nearest)
+                Text("Top Code: \(code)")
+                    .padding()
 
-                Button(action: {
-                    openInMaps(annotation: nearestAnnotation)
-                }) {
-                    Text("Open in Maps")
+                Button("Open in Maps") {
+                    openInMaps(nearest)
                 }
                 .padding()
-
             } else {
-                Text("Calculating nearest restroom...")
-                    .onAppear {
-                        calculateNearestRestroom()
-                    }
+                Text("Calculating nearest bathroom...")
+                    .onAppear(perform: calculateNearest)
             }
         }
-        .onAppear {
-            calculateNearestRestroom()
-        }
-        .onChange(of: restaurantFetcher.userAnnotations) { _ in
-            calculateNearestRestroom()
-        }
-        .onChange(of: locationManager.lastLocation) { _ in
-            calculateNearestRestroom()
-        }
+        .onAppear(perform: calculateNearest)
     }
 
-    func calculateNearestRestroom() {
-        guard let userLocation = locationManager.lastLocation else {
-            return
-        }
-        let annotations = restaurantFetcher.fetchedAnnotations + restaurantFetcher.userAnnotations
+    func calculateNearest() {
+        guard let userLocation = locationManager.lastLocation else { return }
 
-        guard !annotations.isEmpty else {
-            return
-        }
+        let descriptor = FetchDescriptor<Bathroom>()
+        guard let bathrooms = try? context.fetch(descriptor), !bathrooms.isEmpty else { return }
 
-        var closestAnnotation: MKPointAnnotation?
-        var shortestDistance: CLLocationDistance = CLLocationDistanceMax
+        var closest: Bathroom?
+        var shortest: CLLocationDistance = .greatestFiniteMagnitude
 
-        for annotation in annotations {
-            let annotationLocation = CLLocation(latitude: annotation.coordinate.latitude, longitude: annotation.coordinate.longitude)
-            let distance = userLocation.distance(from: annotationLocation)
-            if distance < shortestDistance {
-                shortestDistance = distance
-                closestAnnotation = annotation
+        for bath in bathrooms {
+            let dist = userLocation.distance(from: CLLocation(latitude: bath.latitude, longitude: bath.longitude))
+            if dist < shortest {
+                shortest = dist
+                closest = bath
             }
         }
-
-        if let closest = closestAnnotation {
-            nearestAnnotation = closest
-            let key = "\(closest.coordinate.latitude),\(closest.coordinate.longitude)"
-            note = UserDefaults.standard.string(forKey: key)
-        }
+        nearestBathroom = closest
     }
 
-    func openInMaps(annotation: MKPointAnnotation) {
-        let coordinate = annotation.coordinate
-        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
-        mapItem.name = annotation.title
-        mapItem.openInMaps(launchOptions: nil)
+    func bestCode(for bathroom: Bathroom) -> String {
+        // Sort by net score desc, then newest
+        let sorted = bathroom.codes.sorted {
+            if $0.netScore == $1.netScore {
+                return $0.timestamp > $1.timestamp
+            }
+            return $0.netScore > $1.netScore
+        }
+        return sorted.first?.code ?? "Unknown"
+    }
+
+    func openInMaps(_ bathroom: Bathroom) {
+        let coordinate = CLLocationCoordinate2D(latitude: bathroom.latitude, longitude: bathroom.longitude)
+        let placemark = MKPlacemark(coordinate: coordinate)
+        let mapItem = MKMapItem(placemark: placemark)
+        mapItem.name = bathroom.name
+        mapItem.openInMaps()
     }
 }
-

@@ -1,31 +1,32 @@
-// MapView.swift
+//
+//  MapView.swift
+//  Restroom Locator
+//
 
 import SwiftUI
 import MapKit
 
 struct MapView: UIViewRepresentable {
     var annotations: [MKPointAnnotation]
-    var restaurantFetcher: RestaurantFetcher
+    var bathroomFetcher: BathroomFetcher
     var userLocation: CLLocation?
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
-
-        // Show user location
         mapView.showsUserLocation = true
         mapView.userTrackingMode = .follow
 
-        // Center map on user's location if available
         if let location = userLocation {
             let region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000)
             mapView.setRegion(region, animated: false)
         }
 
-        // Add Long Press Gesture Recognizer
-        let longPressGesture = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(gestureRecognizer:)))
+        let longPressGesture = UILongPressGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleLongPress(gestureRecognizer:))
+        )
         mapView.addGestureRecognizer(longPressGesture)
-
         return mapView
     }
 
@@ -35,50 +36,46 @@ struct MapView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(self, restaurantFetcher: restaurantFetcher)
+        Coordinator(self, bathroomFetcher: bathroomFetcher)
     }
 
     class Coordinator: NSObject, MKMapViewDelegate {
         var parent: MapView
-        var restaurantFetcher: RestaurantFetcher
+        var bathroomFetcher: BathroomFetcher
 
-        init(_ parent: MapView, restaurantFetcher: RestaurantFetcher) {
+        init(_ parent: MapView, bathroomFetcher: BathroomFetcher) {
             self.parent = parent
-            self.restaurantFetcher = restaurantFetcher
+            self.bathroomFetcher = bathroomFetcher
         }
 
-        // Handle Long Press Gesture
         @objc func handleLongPress(gestureRecognizer: UILongPressGestureRecognizer) {
             if gestureRecognizer.state == .began {
                 let touchPoint = gestureRecognizer.location(in: gestureRecognizer.view)
                 if let mapView = gestureRecognizer.view as? MKMapView {
-                    let coordinate = mapView.convert(touchPoint, toCoordinateFrom: mapView)
-
-                    // Create a new annotation
+                    let coord = mapView.convert(touchPoint, toCoordinateFrom: mapView)
                     let annotation = MKPointAnnotation()
-                    annotation.coordinate = coordinate
+                    annotation.coordinate = coord
                     annotation.title = "Custom Location"
 
-                    // Add annotation to the map
                     mapView.addAnnotation(annotation)
 
-                    // Notify to show NoteView
-                    NotificationCenter.default.post(name: NSNotification.Name("AnnotationSelected"), object: annotation)
+                    // Notify our SwiftUI that an annotation was selected
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("AnnotationSelected"),
+                        object: annotation
+                    )
 
-                    // Save the new annotation
+                    // Save to user annotations
                     DispatchQueue.main.async {
-                        self.restaurantFetcher.userAnnotations.append(annotation)
-                        self.restaurantFetcher.saveUserAnnotations()
+                        self.bathroomFetcher.userAnnotations.append(annotation)
+                        self.bathroomFetcher.saveUserAnnotations()
                     }
                 }
             }
         }
 
-        // Customize annotation views
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            if annotation is MKUserLocation {
-                return nil
-            }
+            if annotation is MKUserLocation { return nil }
 
             let identifier = "AnnotationView"
             var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
@@ -90,31 +87,22 @@ struct MapView: UIViewRepresentable {
                 annotationView?.annotation = annotation
             }
 
-            // Check if a note exists
-            let key = "\(annotation.coordinate.latitude),\(annotation.coordinate.longitude)"
-            if UserDefaults.standard.string(forKey: key) != nil {
-                annotationView?.glyphText = "📝"
+            // Simple glyph logic
+            if let ann = annotation as? MKPointAnnotation, ann.title == "Custom Location" {
+                annotationView?.glyphText = "📍"
             } else {
-                // Determine glyph based on annotation source
-                if self.restaurantFetcher.userAnnotations.contains(where: {
-                    $0.coordinate.latitude == annotation.coordinate.latitude &&
-                    $0.coordinate.longitude == annotation.coordinate.longitude
-                }) {
-                    annotationView?.glyphText = "📍"
-                } else {
-                    annotationView?.glyphText = "🍽"
-                }
+                annotationView?.glyphText = "🍽"
             }
-
             return annotationView
         }
 
-        // Handle annotation tap
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
             if let annotation = view.annotation as? MKPointAnnotation {
-                NotificationCenter.default.post(name: NSNotification.Name("AnnotationSelected"), object: annotation)
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("AnnotationSelected"),
+                    object: annotation
+                )
             }
         }
     }
 }
-

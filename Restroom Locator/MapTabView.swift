@@ -1,43 +1,44 @@
-// MapTabView.swift or ContentView.swift
+//
+//  MapTabView.swift
+//  Restroom Locator
+//
 
 import SwiftUI
 import MapKit
 
 struct MapTabView: View {
-    @EnvironmentObject var restaurantFetcher: RestaurantFetcher
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var bathroomFetcher: BathroomFetcher
+
     @State private var selectedAnnotation: MKPointAnnotation?
-    @State private var showNoteView = false
+    @State private var showDetailSheet = false
 
     var body: some View {
         ZStack {
-            MapView(annotations: combinedAnnotations,
-                    restaurantFetcher: restaurantFetcher,
+            MapView(annotations: allAnnotations,
+                    bathroomFetcher: bathroomFetcher,
                     userLocation: locationManager.lastLocation)
-                .edgesIgnoringSafeArea(.all)
-                .onAppear {
-                    if let location = locationManager.lastLocation {
-                        restaurantFetcher.fetchRestaurants(location: location)
-                    }
+            .edgesIgnoringSafeArea(.all)
+            .onAppear {
+                if let loc = locationManager.lastLocation {
+                    bathroomFetcher.fetchBathrooms(around: loc)
                 }
-                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AnnotationSelected")), perform: { notification in
-                    if let annotation = notification.object as? MKPointAnnotation {
-                        selectedAnnotation = annotation
-                        showNoteView = true
-                    }
-                })
-                .onChange(of: locationManager.lastLocation) { newLocation in
-                    if let location = newLocation {
-                        restaurantFetcher.fetchRestaurants(location: location)
-                    }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AnnotationSelected"))) { notif in
+                if let annotation = notif.object as? MKPointAnnotation {
+                    selectedAnnotation = annotation
+                    showDetailSheet = true
                 }
-
-            if showNoteView, let annotation = selectedAnnotation {
-                NoteView(annotation: annotation, isPresented: $showNoteView)
-                    .onDisappear {
-                        // Save user annotations when a note is added
-                        restaurantFetcher.saveUserAnnotations()
-                    }
+            }
+            .onChange(of: locationManager.lastLocation) { newLoc in
+                guard let loc = newLoc else { return }
+                bathroomFetcher.fetchBathrooms(around: loc)
+            }
+        }
+        .sheet(isPresented: $showDetailSheet) {
+            if let annotation = selectedAnnotation {
+                // Show a detail view with codes/comments
+                BathroomDetailView(annotation: annotation)
             }
         }
         .alert(isPresented: $locationManager.permissionDenied) {
@@ -46,7 +47,6 @@ struct MapTabView: View {
                 message: Text("Please enable location permissions in Settings to use this feature."),
                 primaryButton: .cancel(Text("Cancel")),
                 secondaryButton: .default(Text("Open Settings"), action: {
-                    // Open app settings
                     if let appSettings = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(appSettings)
                     }
@@ -55,9 +55,7 @@ struct MapTabView: View {
         }
     }
 
-    // Combine fetched and user annotations
-    var combinedAnnotations: [MKPointAnnotation] {
-        restaurantFetcher.fetchedAnnotations + restaurantFetcher.userAnnotations
+    private var allAnnotations: [MKPointAnnotation] {
+        bathroomFetcher.fetchedAnnotations + bathroomFetcher.userAnnotations
     }
 }
-
