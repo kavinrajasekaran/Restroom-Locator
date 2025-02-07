@@ -18,9 +18,9 @@ A **SwiftUI-based iOS application** that helps users locate the nearest public r
 
 ## 🛠 Tech Stack
 
-```latex
-{\textbf{Restroom Locator} \hfill \href{https://github.com/yourrepo}{\textcolor{blue}{\faGithub}} $|$ \emph{SwiftUI, MapKit, SwiftData, CoreLocation}}{}
-```
+
+SwiftUI, MapKit, SwiftData, CoreLocation
+
 
 ---
 
